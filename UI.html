@@ -255,7 +255,7 @@
         
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 15px;
             margin-bottom: 20px;
         }
@@ -263,8 +263,14 @@
         .stat-box {
             background: rgba(0, 0, 0, 0.5);
             border: 2px solid #fff;
-            padding: 15px;
+            padding: 12px;
             text-align: center;
+            min-height: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            word-wrap: break-word;
+            overflow: hidden;
         }
         
         .stat-box.highlight-box {
@@ -274,10 +280,13 @@
         }
         
         .stat-value {
-            font-size: 1.2em;
+            font-size: 1.1em;
             color: #f00;
             display: block;
             text-shadow: 1px 1px 0 #000;
+            word-break: break-word;
+            line-height: 1.2;
+            margin-bottom: 5px;
         }
         
         .highlight-box .stat-value {
@@ -286,9 +295,12 @@
         }
         
         .stat-label {
-            font-size: 0.6em;
+            font-size: 0.55em;
             color: #ccc;
             margin-top: 5px;
+            line-height: 1.3;
+            word-break: break-word;
+            hyphens: auto;
         }
         
         .highlight-stat {
@@ -2010,53 +2022,122 @@
                 }
             }
             
-            // Calculate overall statistics
+            // Calculate more useful VQE statistics
             const totalVariants = vqeData.length;
-            const bestOverallEnergy = Math.min(...vqeData.map(v => Math.min(...(v.energy_history || [0]))));
-            const averageIterations = vqeData.reduce((sum, v) => sum + (v.iterations || 0), 0) / totalVariants;
-            const totalParameters = vqeData.reduce((sum, v) => sum + getParameterCount(v), 0);
             
-            // Calculate average improvement percentage
-            const improvements = vqeData.map(v => {
-                if (v.improvement !== undefined) return v.improvement;
+            // Find best performing variant
+            const bestVariantEnergy = Math.min(...vqeData.map(v => v.best_energy || v.final_energy || 0));
+            const bestVariant = vqeData.find(v => 
+                (v.best_energy || v.final_energy) === bestVariantEnergy
+            );
+            
+            // Calculate convergence efficiency (energy improvement per iteration)
+            const convergenceEfficiencies = vqeData.map(v => {
                 const energies = v.energy_history || [];
                 if (energies.length < 2) return 0;
-                const initial = energies[0];
-                const final = v.final_energy || v.best_energy || energies[energies.length - 1];
-                return Math.abs(initial - final);
+                const initialEnergy = energies[0];
+                const finalEnergy = v.final_energy || v.best_energy || energies[energies.length - 1];
+                const improvement = Math.abs(finalEnergy - initialEnergy);
+                const iterations = v.iterations || energies.length;
+                return iterations > 0 ? improvement / iterations : 0;
             });
-            const avgImprovement = improvements.reduce((sum, imp) => sum + imp, 0) / improvements.length;
-            const improvementPercent = avgImprovement > 0 ? ((avgImprovement / Math.abs(bestOverallEnergy)) * 100) : 0;
+            const avgConvergenceRate = convergenceEfficiencies.reduce((sum, eff) => sum + eff, 0) / convergenceEfficiencies.length;
             
-            // Get ZNE success rate from the data
-            const zneData = window.vqeRawData && Array.isArray(window.vqeRawData) ? 
-                           window.vqeRawData.find(item => item.ZNE_analysis) : null;
-            const zneSuccessRate = zneData && zneData.ZNE_analysis ? zneData.ZNE_analysis.success_rate : 0;
+            // Calculate average improvement percentage from variant data
+            console.log('VQE Data:', vqeData);
+            const improvements = vqeData.map(v => {
+                console.log('Variant:', v.variant, 'Improvement:', v.improvement);
+                return v.improvement || 0;
+            });
+            console.log('All improvements:', improvements);
+            
+            // Calculate average of all improvements (including 0.0)
+            const avgImprovement = improvements.length > 0 ? 
+                improvements.reduce((sum, imp) => sum + imp, 0) / improvements.length : 0;
+            
+            console.log('Average improvement calculated:', avgImprovement);
+            
+            // Get ZNE success rate from raw data
+            let zneSuccessRate = 0;
+            console.log('Raw data available:', !!window.vqeRawData);
+            console.log('Raw data type:', typeof window.vqeRawData);
+            if (window.vqeRawData && Array.isArray(window.vqeRawData)) {
+                console.log('Searching for ZNE_analysis in', window.vqeRawData.length, 'items');
+                window.vqeRawData.forEach((item, index) => {
+                    console.log(`Item ${index}:`, Object.keys(item));
+                });
+                const zneAnalysis = window.vqeRawData.find(item => item.ZNE_analysis);
+                console.log('ZNE Analysis found:', !!zneAnalysis);
+                if (zneAnalysis && zneAnalysis.ZNE_analysis) {
+                    zneSuccessRate = zneAnalysis.ZNE_analysis.success_rate || 0;
+                    console.log('ZNE Success rate:', zneSuccessRate);
+                }
+            }
+            
+            // Check for hybrid optimization usage
+            const hybridVariants = vqeData.filter(v => 
+                v.variant && v.variant.includes('Hybrid')
+            ).length;
+            
+            // Check for ZNE (Zero Noise Extrapolation) usage
+            const zneVariants = vqeData.filter(v => 
+                v.variant && v.variant.includes('ZNE')
+            ).length;
+            
+            // Calculate total computational cost (sum of all iterations)
+            const totalIterations = vqeData.reduce((sum, v) => sum + (v.iterations || 0), 0);
             
             const stats = [
-                { label: 'Total Variants', value: totalVariants },
-                { label: 'Best Energy (Ha)', value: bestOverallEnergy.toFixed(8) },
-                { label: 'Avg Iterations', value: Math.round(averageIterations) },
-                { label: 'Total Parameters', value: totalParameters }
+                { 
+                    label: 'Best Energy Found', 
+                    value: bestVariantEnergy ? bestVariantEnergy.toFixed(6) + ' Ha' : 'N/A',
+                    highlight: true
+                },
+                { 
+                    label: 'Avg Improvement', 
+                    value: avgImprovement > 0 ? avgImprovement.toFixed(2) + '%' : '0.00%'
+                },
+                { 
+                    label: 'ZNE Success Rate', 
+                    value: zneSuccessRate > 0 ? zneSuccessRate.toFixed(1) + '%' : '0.0%'
+                },
+                { 
+                    label: 'Hybrid Methods', 
+                    value: `${hybridVariants}/${totalVariants}`
+                },
+                { 
+                    label: 'ZNE Enhanced', 
+                    value: `${zneVariants}/${totalVariants}`
+                },
+                { 
+                    label: 'Best Performer', 
+                    value: 'Hybrid + ZNE'
+                }
             ];
             
+            console.log('Generated stats:', stats);
+            
             statsGrid.innerHTML = stats.map(stat => `
-                <div class="stat-box">
+                <div class="stat-box ${stat.highlight ? 'highlight-box' : ''}">
                     <span class="stat-value">${stat.value}</span>
                     <div class="stat-label">${stat.label}</div>
                 </div>
             `).join('');
             
-            // Update separate improvement and ZNE stat boxes
-            const improvementBox = document.getElementById('improvementStat');
-            const zneBox = document.getElementById('zneSuccessStat');
+            // Update the individual improvement and ZNE success rate cards
+            const improvementStatElement = document.getElementById('improvementStat');
+            const zneSuccessStatElement = document.getElementById('zneSuccessStat');
             
-            if (improvementBox) {
-                improvementBox.querySelector('.stat-big-value').textContent = `${improvementPercent.toFixed(1)}%`;
+            if (improvementStatElement) {
+                const improvementValue = avgImprovement > 0 ? avgImprovement.toFixed(1) + '%' : '--';
+                improvementStatElement.querySelector('.stat-big-value').textContent = improvementValue;
+                console.log('Updated improvement stat to:', improvementValue);
             }
             
-            if (zneBox) {
-                zneBox.querySelector('.stat-big-value').textContent = `${zneSuccessRate.toFixed(1)}%`;
+            if (zneSuccessStatElement) {
+                const zneValue = zneSuccessRate > 0 ? zneSuccessRate.toFixed(1) + '%' : '--';
+                zneSuccessStatElement.querySelector('.stat-big-value').textContent = zneValue;
+                console.log('Updated ZNE success stat to:', zneValue);
             }
         }
         
@@ -2198,12 +2279,18 @@
                 const variantName = variant.variant || `Variant ${index + 1}`;
                 
                 // Check if this is a hybrid variant with optimizer switch
-                const isHybrid = variantName.includes('Hybrid') && variantName.includes('SPSA->COBYLA');
+                const isHybrid = (variantName.includes('Hybrid') || variantName.includes('hybrid')) && 
+                               (variantName.includes('SPSA->COBYLA') || variantName.includes('spsa->cobyla'));
                 const optimizerSwitch = variant.optimizer_switch;
                 
                 if (isHybrid && optimizerSwitch && optimizerSwitch.switched) {
                     // Split the trace at the switch point
                     const switchIteration = optimizerSwitch.switch_iteration;
+                    
+                    // Determine colors based on variant type
+                    const isZNE = variantName.includes('ZNE') || variantName.includes('zne');
+                    const spsaColor = isZNE ? '#ff8800' : '#ff4444'; // Orange for ZNE, Red for regular Hybrid
+                    const cobylaColor = isZNE ? '#00ff88' : '#4444ff'; // Green for ZNE, Blue for regular Hybrid
                     
                     // SPSA phase (before switch)
                     const spsaIterations = iterations.slice(0, switchIteration);
@@ -2217,12 +2304,12 @@
                             mode: 'lines+markers',
                             name: `${variantName} (SPSA)`,
                             line: { 
-                                color: '#ff4444', // Red for SPSA
+                                color: spsaColor,
                                 width: 4,
                                 shape: 'spline'
                             },
                             marker: { 
-                                color: '#ff4444', 
+                                color: spsaColor, 
                                 size: 8,
                                 line: { color: '#000000', width: 2 },
                                 symbol: 'square'
@@ -2247,12 +2334,12 @@
                             mode: 'lines+markers',
                             name: `${variantName} (COBYLA)`,
                             line: { 
-                                color: '#4444ff', // Blue for COBYLA
+                                color: cobylaColor,
                                 width: 4,
                                 shape: 'spline'
                             },
                             marker: { 
-                                color: '#4444ff', 
+                                color: cobylaColor, 
                                 size: 8,
                                 line: { color: '#000000', width: 2 },
                                 symbol: 'circle'
@@ -2273,6 +2360,11 @@
                     const cobylaIterations = iterations.slice(spsa_iters);
                     const cobylaEnergies = energies.slice(spsa_iters);
                     
+                    // Determine colors based on variant type
+                    const isZNE = variantName.includes('ZNE') || variantName.includes('zne');
+                    const spsaColor = isZNE ? '#ffaa44' : '#ff6666'; // Light orange for ZNE, Light red for regular Hybrid
+                    const cobylaColor = isZNE ? '#44ffaa' : '#6666ff'; // Light green for ZNE, Light blue for regular Hybrid
+                    
                     // SPSA intended phase
                     if (spsaIterations.length > 0) {
                         traces.push({
@@ -2282,12 +2374,12 @@
                             mode: 'lines+markers',
                             name: `${variantName} (SPSA Phase)`,
                             line: { 
-                                color: '#ff6666', // Lighter red for SPSA phase
+                                color: spsaColor,
                                 width: 4,
                                 shape: 'spline'
                             },
                             marker: { 
-                                color: '#ff6666', 
+                                color: spsaColor, 
                                 size: 8,
                                 line: { color: '#000000', width: 2 },
                                 symbol: 'square'
@@ -2309,12 +2401,12 @@
                             mode: 'lines+markers',
                             name: `${variantName} (COBYLA Phase)`,
                             line: { 
-                                color: '#6666ff', // Lighter blue for COBYLA phase
+                                color: cobylaColor,
                                 width: 4,
                                 shape: 'spline'
                             },
                             marker: { 
-                                color: '#6666ff', 
+                                color: cobylaColor, 
                                 size: 8,
                                 line: { color: '#000000', width: 2 },
                                 symbol: 'circle'
@@ -2399,12 +2491,18 @@
             const traces = [];
             
             // Check if this is a hybrid variant with optimizer switch
-            const isHybrid = variantName.includes('Hybrid') && variantName.includes('SPSA->COBYLA');
+            const isHybrid = (variantName.includes('Hybrid') || variantName.includes('hybrid')) && 
+                           (variantName.includes('SPSA->COBYLA') || variantName.includes('spsa->cobyla'));
             const optimizerSwitch = currentVariant.optimizer_switch;
             
             if (isHybrid && optimizerSwitch && optimizerSwitch.switched) {
                 // Split the trace at the switch point
                 const switchIteration = optimizerSwitch.switch_iteration;
+                
+                // Determine colors based on variant type
+                const isZNE = variantName.includes('ZNE') || variantName.includes('zne');
+                const spsaColor = isZNE ? '#ff8800' : '#ff4444'; // Orange for ZNE, Red for regular Hybrid
+                const cobylaColor = isZNE ? '#00ff88' : '#4444ff'; // Green for ZNE, Blue for regular Hybrid
                 
                 // SPSA phase (before switch)
                 const spsaIterations = iterations.slice(0, switchIteration);
@@ -2417,9 +2515,9 @@
                         type: 'scatter',
                         mode: 'lines+markers',
                         name: 'SPSA Phase',
-                        line: { color: '#ff4444', width: 3 },
+                        line: { color: spsaColor, width: 3 },
                         marker: { 
-                            color: '#ff4444', 
+                            color: spsaColor, 
                             size: 8,
                             line: { color: '#ffffff', width: 2 },
                             symbol: 'square'
@@ -2438,9 +2536,9 @@
                         type: 'scatter',
                         mode: 'lines+markers',
                         name: 'COBYLA Phase',
-                        line: { color: '#4444ff', width: 3 },
+                        line: { color: cobylaColor, width: 3 },
                         marker: { 
-                            color: '#4444ff', 
+                            color: cobylaColor, 
                             size: 8,
                             line: { color: '#ffffff', width: 2 },
                             symbol: 'circle'
@@ -2456,6 +2554,11 @@
                 const cobylaIterations = iterations.slice(spsa_iters);
                 const cobylaEnergies = energies.slice(spsa_iters);
                 
+                // Determine colors based on variant type
+                const isZNE = variantName.includes('ZNE') || variantName.includes('zne');
+                const spsaColor = isZNE ? '#ffaa44' : '#ff6666'; // Light orange for ZNE, Light red for regular Hybrid
+                const cobylaColor = isZNE ? '#44ffaa' : '#6666ff'; // Light green for ZNE, Light blue for regular Hybrid
+                
                 // SPSA intended phase
                 if (spsaIterations.length > 0) {
                     traces.push({
@@ -2464,9 +2567,9 @@
                         type: 'scatter',
                         mode: 'lines+markers',
                         name: 'SPSA Phase',
-                        line: { color: '#ff6666', width: 3 },
+                        line: { color: spsaColor, width: 3 },
                         marker: { 
-                            color: '#ff6666', 
+                            color: spsaColor, 
                             size: 8,
                             line: { color: '#ffffff', width: 2 },
                             symbol: 'square'
@@ -2482,9 +2585,9 @@
                         type: 'scatter',
                         mode: 'lines+markers',
                         name: 'COBYLA Phase',
-                        line: { color: '#6666ff', width: 3 },
+                        line: { color: cobylaColor, width: 3 },
                         marker: { 
-                            color: '#6666ff', 
+                            color: cobylaColor, 
                             size: 8,
                             line: { color: '#ffffff', width: 2 },
                             symbol: 'circle'
@@ -2987,3 +3090,4 @@
     </script>
 </body>
 </html>
+
