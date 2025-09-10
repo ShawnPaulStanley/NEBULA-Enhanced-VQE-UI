@@ -6,7 +6,6 @@
 
 > **🎮 A retro-styled, pixel-perfect quantum computing visualization dashboard for VQE (Variational Quantum Eigensolver) analysis with epic 8-bit aesthetics!**
 
-![Dashboard Preview](https://via.placeholder.com/800x400/000000/FF0000?text=NEBULA+VQE+DASHBOARD)
 
 ## ✨ Features
 
