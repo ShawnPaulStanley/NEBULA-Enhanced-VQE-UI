@@ -1,7 +1,6 @@
 # 🚀 NEBULA VQE Dashboard 🚀
 
 [![GitHub stars](https://img.shields.io/github/stars/username/repo.svg?style=social&label=Star)](https://github.com/username/repo)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Made with ❤️](https://img.shields.io/badge/Made%20with-❤️-red.svg)](https://github.com/username/repo)
 
 > **🎮 A retro-styled, pixel-perfect quantum computing visualization dashboard for VQE (Variational Quantum Eigensolver) analysis with epic 8-bit aesthetics!**
@@ -163,9 +162,7 @@ We welcome contributions! Here's how to get started:
 4. **Push** to the branch (`git push origin feature/amazing-feature`)
 5. **Open** a Pull Request
 
-## 📝 **License**
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 **Acknowledgments**
 
@@ -174,11 +171,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Three.js**: For 3D rendering support
 - **Press Start 2P**: For the perfect retro font
 
-## 📞 **Contact**
-
-- **GitHub**: [@yourusername](https://github.com/yourusername)
-- **Email**: your.email@example.com
-- **Twitter**: [@yourusername](https://twitter.com/yourusername)
 
 ---
 
